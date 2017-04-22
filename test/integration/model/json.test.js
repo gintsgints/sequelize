@@ -1,36 +1,33 @@
 'use strict';
 
-/* jshint -W030 */
-/* jshint -W110 */
-var chai = require('chai')
-  , Sequelize = require('../../../index')
-  , Promise = Sequelize.Promise
-  , expect = chai.expect
-  , Support = require(__dirname + '/../support')
-  , DataTypes = require(__dirname + '/../../../lib/data-types')
-  , current = Support.sequelize;
+const chai = require('chai'),
+  Sequelize = require('../../../index'),
+  Promise = Sequelize.Promise,
+  expect = chai.expect,
+  Support = require(__dirname + '/../support'),
+  DataTypes = require(__dirname + '/../../../lib/data-types'),
+  current = Support.sequelize;
 
-describe(Support.getTestDialectTeaser('Model'), function() {
-  if (current.dialect.supports.JSONB) {
-    describe('JSONB', function () {
-      beforeEach(function () {
+describe(Support.getTestDialectTeaser('Model'), () => {
+  if (current.dialect.supports.JSON) {
+    describe('JSON', () => {
+      beforeEach(function() {
         this.Event = this.sequelize.define('Event', {
           data: {
-            type: DataTypes.JSONB,
+            type: DataTypes.JSON,
             field: 'event_data',
             index: true
           },
           json: DataTypes.JSON
         });
 
-        return this.Event.sync({force: true});
+        return this.Event.sync({ force: true });
       });
 
       if (current.dialect.supports.lock) {
         it('findOrCreate supports transactions, json and locks', function() {
-          var self = this;
-          return current.transaction().then(function(t) {
-            return self.Event.findOrCreate({
+          return current.transaction().then(transaction => {
+            return this.Event.findOrCreate({
               where: {
                 json: { some: { input: 'Hello' } }
               },
@@ -38,18 +35,18 @@ describe(Support.getTestDialectTeaser('Model'), function() {
                 json: { some: { input: 'Hello' }, input: [1, 2, 3] },
                 data: { some: { input: 'There' }, input: [4, 5, 6] }
               },
-              transaction: t,
-              lock: t.LOCK.UPDATE,
-              logging: function (sql) {
+              transaction,
+              lock: transaction.LOCK.UPDATE,
+              logging: sql => {
                 if (sql.indexOf('SELECT') !== -1 && sql.indexOf('CREATE') === -1) {
                   expect(sql.indexOf('FOR UPDATE')).not.to.be.equal(-1);
                 }
               }
-            }).then(function() {
-              return self.Event.count().then(function(count) {
+            }).then(() => {
+              return this.Event.count().then(count => {
                 expect(count).to.equal(0);
-                return t.commit().then(function() {
-                  return self.Event.count().then(function(count) {
+                return transaction.commit().then(() => {
+                  return this.Event.count().then(count => {
                     expect(count).to.equal(1);
                   });
                 });
@@ -59,67 +56,9 @@ describe(Support.getTestDialectTeaser('Model'), function() {
         });
       }
 
-      it('should create an instance with JSONB data', function () {
-        return this.Event.create({
-          data: {
-            name: {
-              first: 'Homer',
-              last: 'Simpson'
-            },
-            employment: 'Nuclear Safety Inspector'
-          }
-        }).bind(this).then(function () {
-          return this.Event.findAll().then(function (events) {
-            var event = events[0];
-
-            expect(event.get('data')).to.eql({
-              name: {
-                first: 'Homer',
-                last: 'Simpson'
-              },
-              employment: 'Nuclear Safety Inspector'
-            });
-          });
-        });
-      });
-
-      it('should update an instance with JSONB data', function () {
-        return this.Event.create({
-          data: {
-            name: {
-              first: 'Homer',
-              last: 'Simpson'
-            },
-            employment: 'Nuclear Safety Inspector'
-          }
-        }).bind(this).then(function (event) {
-          return event.update({
-            data: {
-              name: {
-                first: 'Homer',
-                last: 'Simpson'
-              },
-              employment: null
-            }
-          });
-        }).then(function () {
-          return this.Event.findAll().then(function (events) {
-            var event = events[0];
-
-            expect(event.get('data')).to.eql({
-              name: {
-                first: 'Homer',
-                last: 'Simpson'
-              },
-              employment: null
-            });
-          });
-        });
-      });
-
-      it('should be possible to query a nested value', function () {
-        return Promise.join(
-          this.Event.create({
+      describe('create', () => {
+        it('should create an instance with JSON data', function() {
+          return this.Event.create({
             data: {
               name: {
                 first: 'Homer',
@@ -127,85 +66,113 @@ describe(Support.getTestDialectTeaser('Model'), function() {
               },
               employment: 'Nuclear Safety Inspector'
             }
-          }),
-          this.Event.create({
-            data: {
-              name: {
-                first: 'Marge',
-                last: 'Simpson'
-              },
-              employment: 'Housewife'
-            }
-          })
-        ).bind(this).then(function () {
-          return this.Event.findAll({
-            where: {
-              data: {
-                employment: 'Housewife'
-              }
-            }
-          }).then(function (events) {
-            var event = events[0];
+          }).then(() => {
+            return this.Event.findAll().then(events => {
+              const event = events[0];
 
-            expect(events.length).to.equal(1);
-            expect(event.get('data')).to.eql({
-              name: {
-                first: 'Marge',
-                last: 'Simpson'
-              },
-              employment: 'Housewife'
+              expect(event.get('data')).to.eql({
+                name: {
+                  first: 'Homer',
+                  last: 'Simpson'
+                },
+                employment: 'Nuclear Safety Inspector'
+              });
             });
           });
         });
       });
 
-      it('should be possible to query a nested integer value', function () {
-        return Promise.join(
-          this.Event.create({
+      describe('update', () => {
+        it('should update with JSON column (dot notation)', function() {
+          return this.Event.bulkCreate([{
+            id: 1,
             data: {
               name: {
                 first: 'Homer',
                 last: 'Simpson'
               },
-              age: 40
+              employment: 'Nuclear Safety Inspector'
             }
-          }),
-          this.Event.create({
+          }, {
+            id: 2,
             data: {
               name: {
-                first: 'Marge',
+                first: 'Rick',
+                last: 'Sanchez'
+              },
+              employment: 'Multiverse Scientist'
+            }
+          }]).then(() => this.Event.update({
+            'data': {
+              name: {
+                first: 'Rick',
+                last: 'Sanchez'
+              },
+              employment: 'Galactic Fed Prisioner'
+            }
+          }, {
+            where: {
+              'data.name.first': 'Rick'
+            }
+          })).then(() => this.Event.findById(2)).then(event => {
+            expect(event.get('data')).to.eql({
+              name: {
+                first: 'Rick',
+                last: 'Sanchez'
+              },
+              employment: 'Galactic Fed Prisioner'
+            });
+          });
+        });
+
+        it('should update with JSON column (JSON notation)', function() {
+          return this.Event.bulkCreate([{
+            id: 1,
+            data: {
+              name: {
+                first: 'Homer',
                 last: 'Simpson'
               },
-              age: 37
+              employment: 'Nuclear Safety Inspector'
             }
-          })
-        ).bind(this).then(function () {
-          return this.Event.findAll({
+          }, {
+            id: 2,
+            data: {
+              name: {
+                first: 'Rick',
+                last: 'Sanchez'
+              },
+              employment: 'Multiverse Scientist'
+            }
+          }]).then(() => this.Event.update({
+            'data': {
+              name: {
+                first: 'Rick',
+                last: 'Sanchez'
+              },
+              employment: 'Galactic Fed Prisioner'
+            }
+          }, {
             where: {
               data: {
-                age: {
-                  $gt: 38
+                name: {
+                  first: 'Rick'
                 }
               }
             }
-          }).then(function (events) {
-            var event = events[0];
-
-            expect(events.length).to.equal(1);
+          })).then(() => this.Event.findById(2)).then(event => {
             expect(event.get('data')).to.eql({
               name: {
-                first: 'Homer',
-                last: 'Simpson'
+                first: 'Rick',
+                last: 'Sanchez'
               },
-              age: 40
+              employment: 'Galactic Fed Prisioner'
             });
           });
         });
-      });
 
-      it('should be possible to query a nested null value', function () {
-        return Promise.join(
-          this.Event.create({
+        it('should update an instance with JSON data', function() {
+          return this.Event.create({
             data: {
               name: {
                 first: 'Homer',
@@ -213,49 +180,45 @@ describe(Support.getTestDialectTeaser('Model'), function() {
               },
               employment: 'Nuclear Safety Inspector'
             }
-          }),
-          this.Event.create({
-            data: {
-              name: {
-                first: 'Marge',
-                last: 'Simpson'
-              },
-              employment: null
-            }
-          })
-        ).bind(this).then(function () {
-          return this.Event.findAll({
-            where: {
+          }).then(event => {
+            return event.update({
               data: {
+                name: {
+                  first: 'Homer',
+                  last: 'Simpson'
+                },
                 employment: null
               }
-            }
-          }).then(function (events) {
-            expect(events.length).to.equal(1);
-            expect(events[0].get('data')).to.eql({
-              name: {
-                first: 'Marge',
-                last: 'Simpson'
-              },
-              employment: null
+            });
+          }).then(() => {
+            return this.Event.findAll().then(events => {
+              const event = events[0];
+
+              expect(event.get('data')).to.eql({
+                name: {
+                  first: 'Homer',
+                  last: 'Simpson'
+                },
+                employment: null
+              });
             });
           });
         });
       });
 
-      it('should be possible to query multiple nested values', function () {
-        var self = this;
-        return this.Event.create({
-          data: {
-            name: {
-              first: 'Homer',
-              last: 'Simpson'
-            },
-            employment: 'Nuclear Safety Inspector'
-          }
-        }).then(function() {
+      describe('find', () => {
+        it('should be possible to query a nested value', function() {
           return Promise.join(
-            self.Event.create({
+            this.Event.create({
+              data: {
+                name: {
+                  first: 'Homer',
+                  last: 'Simpson'
+                },
+                employment: 'Nuclear Safety Inspector'
+              }
+            }),
+            this.Event.create({
               data: {
                 name: {
                   first: 'Marge',
@@ -263,100 +226,286 @@ describe(Support.getTestDialectTeaser('Model'), function() {
                 },
                 employment: 'Housewife'
               }
-            }),
-            self.Event.create({
-              data: {
-                name: {
-                  first: 'Bart',
-                  last: 'Simpson'
-                },
-                employment: 'None'
-              }
             })
-          );
-        }).then(function () {
-          return self.Event.findAll({
-            where: {
-              data: {
-                name: {
-                  last: 'Simpson'
-                },
-                employment: {
-                  $ne: 'None'
+          ).then(() => {
+            return this.Event.findAll({
+              where: {
+                data: {
+                  employment: 'Housewife'
                 }
               }
-            },
-            order: [
-              ['id', 'ASC']
-            ]
-          }).then(function (events) {
-            expect(events.length).to.equal(2);
+            }).then(events => {
+              const event = events[0];
 
-            expect(events[0].get('data')).to.eql({
+              expect(events.length).to.equal(1);
+              expect(event.get('data')).to.eql({
+                name: {
+                  first: 'Marge',
+                  last: 'Simpson'
+                },
+                employment: 'Housewife'
+              });
+            });
+          });
+        });
+
+        it('should be possible to query a nested integer value', function() {
+          return Promise.join(
+            this.Event.create({
+              data: {
+                name: {
+                  first: 'Homer',
+                  last: 'Simpson'
+                },
+                age: 40
+              }
+            }),
+            this.Event.create({
+              data: {
+                name: {
+                  first: 'Marge',
+                  last: 'Simpson'
+                },
+                age: 37
+              }
+            })
+          ).then(() => {
+            return this.Event.findAll({
+              where: {
+                data: {
+                  age: {
+                    $gt: 38
+                  }
+                }
+              }
+            }).then(events => {
+              const event = events[0];
+
+              expect(events.length).to.equal(1);
+              expect(event.get('data')).to.eql({
+                name: {
+                  first: 'Homer',
+                  last: 'Simpson'
+                },
+                age: 40
+              });
+            });
+          });
+        });
+
+        it('should be possible to query a nested null value', function() {
+          return Promise.join(
+            this.Event.create({
+              data: {
+                name: {
+                  first: 'Homer',
+                  last: 'Simpson'
+                },
+                employment: 'Nuclear Safety Inspector'
+              }
+            }),
+            this.Event.create({
+              data: {
+                name: {
+                  first: 'Marge',
+                  last: 'Simpson'
+                },
+                employment: null
+              }
+            })
+          ).then(() => {
+            return this.Event.findAll({
+              where: {
+                data: {
+                  employment: null
+                }
+              }
+            }).then(events => {
+              expect(events.length).to.equal(1);
+              expect(events[0].get('data')).to.eql({
+                name: {
+                  first: 'Marge',
+                  last: 'Simpson'
+                },
+                employment: null
+              });
+            });
+          });
+        });
+
+        it('should be possible to query multiple nested values', function() {
+          return this.Event.create({
+            data: {
               name: {
                 first: 'Homer',
                 last: 'Simpson'
               },
               employment: 'Nuclear Safety Inspector'
-            });
-
-            expect(events[1].get('data')).to.eql({
-              name: {
-                first: 'Marge',
-                last: 'Simpson'
+            }
+          }).then(() => {
+            return Promise.join(
+              this.Event.create({
+                data: {
+                  name: {
+                    first: 'Marge',
+                    last: 'Simpson'
+                  },
+                  employment: 'Housewife'
+                }
+              }),
+              this.Event.create({
+                data: {
+                  name: {
+                    first: 'Bart',
+                    last: 'Simpson'
+                  },
+                  employment: 'None'
+                }
+              })
+            );
+          }).then(() => {
+            return this.Event.findAll({
+              where: {
+                data: {
+                  name: {
+                    last: 'Simpson'
+                  },
+                  employment: {
+                    $ne: 'None'
+                  }
+                }
               },
-              employment: 'Housewife'
+              order: [
+                ['id', 'ASC']
+              ]
+            }).then(events => {
+              expect(events.length).to.equal(2);
+
+              expect(events[0].get('data')).to.eql({
+                name: {
+                  first: 'Homer',
+                  last: 'Simpson'
+                },
+                employment: 'Nuclear Safety Inspector'
+              });
+
+              expect(events[1].get('data')).to.eql({
+                name: {
+                  first: 'Marge',
+                  last: 'Simpson'
+                },
+                employment: 'Housewife'
+              });
             });
           });
         });
       });
 
-      it('should be possible to destroy with where', function () {
-        var conditionSearch = {
-          where: {
-            data: {
-              employment : 'Hacker'
+      describe('destroy', () => {
+        it('should be possible to destroy with where', function() {
+          const conditionSearch = {
+            where: {
+              data: {
+                employment: 'Hacker'
+              }
             }
-          }
-        };
+          };
 
-        return Promise.join(
-          this.Event.create({
-            data: {
-              name: {
-                first: 'Elliot',
-                last: 'Alderson'
-              },
-              employment: 'Hacker'
-            }
-          }),
-          this.Event.create({
-            data: {
-              name: {
-                first: 'Christian',
-                last: 'Slater'
-              },
-              employment: 'Hacker'
-            }
-          }),
-          this.Event.create({
-            data: {
-              name: {
-                first: ' Tyrell',
-                last: 'Wellick'
-              },
-              employment: 'CTO'
-            }
-          })
-        ).bind(this).then(function () {
+          return Promise.join(
+            this.Event.create({
+              data: {
+                name: {
+                  first: 'Elliot',
+                  last: 'Alderson'
+                },
+                employment: 'Hacker'
+              }
+            }),
+            this.Event.create({
+              data: {
+                name: {
+                  first: 'Christian',
+                  last: 'Slater'
+                },
+                employment: 'Hacker'
+              }
+            }),
+            this.Event.create({
+              data: {
+                name: {
+                  first: ' Tyrell',
+                  last: 'Wellick'
+                },
+                employment: 'CTO'
+              }
+            })
+          ).then(() => {
             return expect(this.Event.findAll(conditionSearch)).to.eventually.have.length(2);
-          }).then(function() {
+          }).then(() => {
             return this.Event.destroy(conditionSearch);
-          }).then(function(){
+          }).then(() => {
             return expect(this.Event.findAll(conditionSearch)).to.eventually.have.length(0);
           });
+        });
       });
 
+      describe('sql injection attacks', () => {
+        beforeEach(function() {
+          this.Model = this.sequelize.define('Model', {
+            data: DataTypes.JSON
+          });
+          return this.sequelize.sync({ force: true });
+        });
+
+        it('should properly escape the single quotes', function() {
+          return this.Model.create({
+            data: {
+              type: 'Point',
+              properties: {
+                exploit: "'); DELETE YOLO INJECTIONS; -- "
+              }
+            }
+          });
+        });
+
+        it('should properly escape the single quotes in array', function() {
+          return this.Model.create({
+            data: {
+              type: 'Point',
+              coordinates: [39.807222, "'); DELETE YOLO INJECTIONS; --"]
+            }
+          });
+        });
+
+        it('should be possible to find with properly escaped select query', function() {
+          return this.Model.create({
+            data: {
+              type: 'Point',
+              properties: {
+                exploit: "'); DELETE YOLO INJECTIONS; -- "
+              }
+            }
+          }).then(() => {
+            return this.Model.findOne({
+              where: {
+                data: {
+                  type: 'Point',
+                  properties: {
+                    exploit: "'); DELETE YOLO INJECTIONS; -- "
+                  }
+                }
+              }
+            });
+          }).then(result => {
+            expect(result.get('data')).to.deep.equal({
+              type: 'Point',
+              properties: {
+                exploit: "'); DELETE YOLO INJECTIONS; -- "
+              }
+            });
+          });
+        });
+      });
     });
   }
 });
